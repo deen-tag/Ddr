@@ -49,10 +49,19 @@ BASE_URL = "https://www.restposten24.de"
 # catégorie un peu large (Sonstige PC-Komponenten) ne pose pas de
 # problème : les annonces hors-sujet seront simplement ignorées.
 #
-# Format d'URL confirmé par les logs de production (les anciennes URLs
-# statiques en .html type "/Computer/RAM-Speicher/cat56_0.html" ne
-# renvoient plus d'annonces) :
-#   /index.php?mod=rp24_global&mode=singlecat&func=cat&cat=<ID>&page=<N>&orderBy=offers_date
+# Format d'URL vérifié manuellement le 07/09/2026 (récupération directe
+# du HTML, sans JS) :
+#   /index.php?cat=<ID>&func=cat&mod=rp24_global&mode=singlecat
+# renvoie bien les annonces en HTML côté serveur pour la page 1.
+#
+# L'ancienne version de ce script ajoutait "&page=<N>&orderBy=offers_date"
+# dès la première page, ce qui semble faire échouer le rendu serveur
+# (page vide malgré un statut 200) : c'est très probablement la cause du
+# "0 résultat" observé en production. On n'ajoute donc "page" que pour
+# les pages 2 et suivantes, et on retire orderBy. Si "page=2" s'avère
+# lui aussi incorrect (à vérifier avec les logs [diag] ci-dessous), les
+# noms de paramètres à essayer en premier sont : "p", "seite", ou un
+# numéro dans le chemin plutôt qu'en query string.
 CATEGORY_IDS = {
     "RAM-Speicher": 56,
     "Sonstige PC-Komponenten": 59,
@@ -63,10 +72,10 @@ MAX_PAGES_PER_CATEGORY = 20
 
 
 def build_category_page_url(cat_id: int, page: int) -> str:
-    return (
-        f"{BASE_URL}/index.php?mod=rp24_global&mode=singlecat"
-        f"&func=cat&cat={cat_id}&page={page}&orderBy=offers_date"
-    )
+    url = f"{BASE_URL}/index.php?cat={cat_id}&func=cat&mod=rp24_global&mode=singlecat"
+    if page > 1:
+        url += f"&page={page}"
+    return url
 
 HEADERS = {
     "User-Agent": (
