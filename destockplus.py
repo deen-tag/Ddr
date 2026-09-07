@@ -77,8 +77,26 @@ class Lot:
 
 def fetch(url: str) -> BeautifulSoup:
     resp = requests.get(url, headers=HEADERS, timeout=20)
+    print(
+        f"[diag] GET {url} -> status={resp.status_code} "
+        f"taille={len(resp.text)} caractères",
+        file=sys.stderr,
+    )
     resp.raise_for_status()
-    return BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(resp.text, "html.parser")
+    all_links = soup.find_all("a", href=True)
+    ad_links = [a for a in all_links if AD_LINK_RE.match(a["href"])]
+    print(
+        f"[diag] {len(all_links)} liens <a> trouvés, "
+        f"{len(ad_links)} correspondent au motif d'annonce",
+        file=sys.stderr,
+    )
+    if not ad_links:
+        # On imprime les 500 premiers caractères pour voir ce qu'on a vraiment reçu
+        # (page de blocage / captcha / structure différente, etc.)
+        print("[diag] Aucun lien d'annonce trouvé. Aperçu du HTML reçu :", file=sys.stderr)
+        print(resp.text[:1500], file=sys.stderr)
+    return soup
 
 
 def parse_number(raw: str) -> Optional[float]:
