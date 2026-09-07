@@ -11,7 +11,7 @@
     "price_per_go_eur": 3.125,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-904002-lot-ram-4go-ddr4.html",
-    "scraped_at": "2026-09-07T20:05:14.933794+00:00",
+    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
     "is_new": false
   },
   {
@@ -26,7 +26,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930962-ram-portable-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:14.933794+00:00",
+    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
     "is_new": false
   },
   {
@@ -41,7 +41,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930960-ram-fixe-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:14.933794+00:00",
+    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
     "is_new": false
   },
   {
@@ -56,7 +56,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930959-ram-fixe-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:14.933794+00:00",
+    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
     "is_new": false
   },
   {
@@ -71,8 +71,38 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930961-ram-portable-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:14.933794+00:00",
+    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
     "is_new": false
+  },
+  {
+    "id": "destockplus-960507",
+    "title": "ASUS ZENBOOK 14 OLED UN5401Q, i7 , 16GB RAM DDR4 , 512GB; WINDOWS 11 PRO",
+    "memory_type": "DDR4",
+    "quantity": 100,
+    "unit_capacity_go": null,
+    "total_go": null,
+    "price_total_eur": 345.0,
+    "price_is_per_unit": false,
+    "price_per_go_eur": null,
+    "source": "Destockplus",
+    "url": "https://www.destockplus.com/acheter/c-960507-asus-zenbook-14-oled-un5401q-i7.html",
+    "scraped_at": "2026-09-07T20:09:40.730687+00:00",
+    "is_new": true
+  },
+  {
+    "id": "destockplus-960506",
+    "title": "ASUS ROG STRIX G512L-VHN146T i7-10750H 16GB RAM DDR4 2933 RAM , 1TB SSD \"15.6",
+    "memory_type": "DDR4",
+    "quantity": 100,
+    "unit_capacity_go": null,
+    "total_go": null,
+    "price_total_eur": 345.0,
+    "price_is_per_unit": false,
+    "price_per_go_eur": null,
+    "source": "Destockplus",
+    "url": "https://www.destockplus.com/acheter/c-960506-asus-rog-strix-g512l-vhn146t-i7.html",
+    "scraped_at": "2026-09-07T20:09:40.730687+00:00",
+    "is_new": true
   },
   {
     "id": "destockplus-930962",
@@ -86,7 +116,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930962-ram-portable-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:17.031235+00:00",
+    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
     "is_new": false
   },
   {
@@ -101,7 +131,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930960-ram-fixe-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:17.031235+00:00",
+    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
     "is_new": false
   },
   {
@@ -116,7 +146,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930959-ram-fixe-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:17.031235+00:00",
+    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
     "is_new": false
   },
   {
@@ -131,7 +161,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930961-ram-portable-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:05:17.031235+00:00",
+    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
     "is_new": false
   },
   {
@@ -146,7 +176,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-970566-lot-ram-serveur-samsung-ddr5-rdimm.html",
-    "scraped_at": "2026-09-07T20:05:17.031235+00:00",
+    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
     "is_new": false
   }
 ]
