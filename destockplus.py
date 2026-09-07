@@ -42,37 +42,32 @@ from common import (
 
 BASE_URL = "https://www.destockplus.com"
 
-# Une page de recherche par type de mémoire. On pourra en ajouter
-# (ex: "ddr4-sodimm", "ddr5-ecc") si on veut affiner plus tard.
-# Le "0" dans l'URL est l'index de page (0 = première page). On s'en
-# sert comme gabarit pour générer les pages suivantes (1, 2, 3, ...).
+# Moteur de recherche interne du site (cat_select=18 = catégorie
+# "Informatique"), avec une pagination classique &page=N vérifiée
+# manuellement le 07/09/2026 (ex: search.php?match=1&cat_select=18&page=47
+# renvoie bien la page 47, sans décalage ni doublon). On préfère cette
+# URL à l'ancienne "acheter/recherche-fournisseur-N-ddrX.html", dont la
+# pagination (page 0 = page 1, page "1" supposée être un doublon, on
+# reprend à "2") reposait sur une hypothèse non vérifiée et limitait
+# probablement le nombre de résultats récupérés.
 SEARCH_PAGES = {
-    "DDR4": f"{BASE_URL}/acheter/recherche-fournisseur-0-ddr4.html",
-    "DDR5": f"{BASE_URL}/acheter/recherche-fournisseur-0-ddr5.html",
+    "DDR4": f"{BASE_URL}/search.php?match=1&cat_select=18&search=ddr4",
+    "DDR5": f"{BASE_URL}/search.php?match=1&cat_select=18&search=ddr5",
 }
 
 # Filet de sécurité : nombre maximum de pages qu'on ira chercher pour un
-# même type de mémoire. La catégorie DDR4 comptait ~286 annonces sur 10
-# pages de 30 au moment de l'écriture ; on garde une marge.
+# même type de mémoire.
 MAX_PAGES = 30
-
-# Motif pour repérer l'index de page dans l'URL (le nombre juste avant
-# "-ddr4.html" ou "-ddr5.html") et pouvoir le remplacer.
-PAGE_INDEX_RE = re.compile(r"-(\d+)-(ddr[45])\.html$")
 
 
 def build_page_url(first_page_url: str, display_page: int) -> str:
     """Construit l'URL de la page N (1 = première page affichée).
 
-    Particularité confirmée en conditions réelles sur Destockplus : la
-    première page est accessible via l'index "0" dans l'URL, et
-    l'index "1" est un DOUBLON de la page 0 (pas une vraie page 2) —
-    les pages suivantes reprennent une numérotation normale à partir de
-    "2". Le site "saute" donc le numéro 1. Ex: pages affichées
-    1, 2, 3, ... 10 correspondent aux URLs -0-, -2-, -3-, ... -10-.
-    """
-    url_index = 0 if display_page <= 1 else display_page
-    return PAGE_INDEX_RE.sub(lambda m: f"-{url_index}-{m.group(2)}.html", first_page_url)
+    Pagination classique : la page 1 est l'URL de base (sans paramètre
+    "page"), les pages suivantes ajoutent simplement "&page=N"."""
+    if display_page <= 1:
+        return first_page_url
+    return f"{first_page_url}&page={display_page}"
 
 HEADERS = {
     "User-Agent": (
