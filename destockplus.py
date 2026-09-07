@@ -167,6 +167,9 @@ def title_link_for_group(links: list) -> object:
             best_link = link
             best_len = len(text)
     return best_link
+
+
+def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) -> list[Lot]:
     lots: list[Lot] = []
     now = datetime.now(timezone.utc).isoformat()
 
