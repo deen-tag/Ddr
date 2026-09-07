@@ -58,6 +58,10 @@ RE_QTE = re.compile(r"Quantit[ée]\s*:\s*([\d\s]+)", re.IGNORECASE)
 RE_PRIX = re.compile(
     r"Prix\s*:\s*([\d\s.,]+)\s*€?\s*(HT)?\s*(/\s*Unit[ée])?", re.IGNORECASE
 )
+# Secours : un simple montant suivi de € (pas de mot "Prix" devant),
+# ex: "620,00 €" ou "12.5€" - format qu'on suppose être utilisé sur la
+# page de résultats (à confirmer via les diagnostics).
+RE_PRIX_NU = re.compile(r"([\d]{1,3}(?:[\s.,]\d{3})*(?:[.,]\d{1,2})?)\s*€")
 RE_CAPACITY_GO = re.compile(r"(\d+)\s*Go", re.IGNORECASE)
 
 
@@ -152,7 +156,17 @@ def best_title_for_group(links: list) -> str:
     return max(pool, key=len) if pool else ""
 
 
-def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) -> list[Lot]:
+def title_link_for_group(links: list) -> object:
+    """Retourne le lien du groupe qui porte le vrai titre (texte le plus
+    long, pas juste un nombre) plutôt qu'un lien de notation/étoiles."""
+    best_link = links[0]
+    best_len = -1
+    for link in links:
+        text = link.get_text(strip=True)
+        if text and not text.isdigit() and len(text) > best_len:
+            best_link = link
+            best_len = len(text)
+    return best_link
     lots: list[Lot] = []
     now = datetime.now(timezone.utc).isoformat()
 
@@ -190,31 +204,37 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
             continue
 
         # On cherche le texte "Quantité / Prix" dans le voisinage du
-        # lien (le conteneur parent de l'annonce), en remontant jusqu'à
-        # trouver un bloc qui contient ces deux informations.
-        container = group_links[0]
+        # lien qui porte le VRAI titre (pas un lien de notation), en
+        # remontant jusqu'à trouver un bloc qui contient ces infos ou
+        # un montant en €.
+        title_link = title_link_for_group(group_links)
+        container = title_link
         context_text = ""
-        for _ in range(6):
+        for _ in range(10):
             if container.parent is None:
                 break
             container = container.parent
             context_text = container.get_text(" ", strip=True)
-            if "Quantité" in context_text or "Prix" in context_text:
+            if "Quantité" in context_text or "Prix" in context_text or "€" in context_text:
                 break
 
         qte_match = RE_QTE.search(context_text)
         prix_match = RE_PRIX.search(context_text)
+        prix_nu_match = None
+        if not prix_match:
+            prix_nu_match = RE_PRIX_NU.search(context_text)
 
         if debug_shown < 8:
             print(
                 f"[diag] Annonce gardée : titre={title!r} "
                 f"qte_trouvee={bool(qte_match)} prix_trouve={bool(prix_match)} "
-                f"contexte(200c)={context_text[:200]!r}",
+                f"prix_nu_trouve={bool(prix_nu_match)} "
+                f"contexte(300c)={context_text[:300]!r}",
                 file=sys.stderr,
             )
             debug_shown += 1
 
-        if html_dump_shown < 2 and not prix_match:
+        if html_dump_shown < 3 and not prix_match and not prix_nu_match:
             print(
                 f"[diag] --- HTML complet du conteneur pour {title!r} ---",
                 file=sys.stderr,
@@ -224,8 +244,15 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
             html_dump_shown += 1
 
         quantity = int(parse_number(qte_match.group(1))) if qte_match else None
-        price_total = parse_number(prix_match.group(1)) if prix_match else None
-        price_is_per_unit = bool(prix_match and prix_match.group(3))
+        if prix_match:
+            price_total = parse_number(prix_match.group(1))
+            price_is_per_unit = bool(prix_match.group(3))
+        elif prix_nu_match:
+            price_total = parse_number(prix_nu_match.group(1))
+            price_is_per_unit = False
+        else:
+            price_total = None
+            price_is_per_unit = False
 
         capacity_match = RE_CAPACITY_GO.search(title)
         unit_capacity_go = int(capacity_match.group(1)) if capacity_match else None
