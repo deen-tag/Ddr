@@ -111,7 +111,30 @@ def fetch(url: str) -> Optional[BeautifulSoup]:
     )
     if resp.status_code != 200:
         return None
-    return BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    all_links = soup.find_all("a", href=True)
+    ad_links = [a for a in all_links if AD_LINK_RE.match(a["href"])]
+    if not ad_links:
+        # Aucun lien ne matche le motif attendu : on affiche les vraies
+        # formes d'URL trouvées sur la page pour pouvoir corriger
+        # AD_LINK_RE si le gabarit du site a changé (ou si cette
+        # catégorie n'a simplement aucune annonce en ce moment).
+        print(
+            f"[diag] Aucun lien d'annonce trouvé sur {url} ({len(all_links)} liens <a> au total). "
+            "Formes d'URL distinctes trouvées :",
+            file=sys.stderr,
+        )
+        shapes = {}
+        for a in all_links:
+            href = a["href"]
+            shape = re.sub(r"\d+", "#", href)
+            if shape not in shapes:
+                shapes[shape] = (href, a.get_text(strip=True)[:40])
+        for shape, (href, texte) in list(shapes.items())[:25]:
+            print(f"[diag]   forme={shape!r}  exemple={href!r}  texte={texte!r}", file=sys.stderr)
+
+    return soup
 
 
 def extract_ad_id(href: str) -> str:
