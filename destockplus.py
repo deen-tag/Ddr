@@ -52,9 +52,8 @@ SEARCH_PAGES = {
 }
 
 # Filet de sécurité : nombre maximum de pages qu'on ira chercher pour un
-# même type de mémoire, même si le site semble en proposer indéfiniment.
-# Évite une boucle infinie / un scraping trop long en cas de mauvaise
-# détection de la fin de pagination.
+# même type de mémoire. La catégorie DDR4 comptait ~286 annonces sur 10
+# pages de 30 au moment de l'écriture ; on garde une marge.
 MAX_PAGES = 30
 
 # Motif pour repérer l'index de page dans l'URL (le nombre juste avant
@@ -62,11 +61,18 @@ MAX_PAGES = 30
 PAGE_INDEX_RE = re.compile(r"-(\d+)-(ddr[45])\.html$")
 
 
-def build_page_url(first_page_url: str, page_index: int) -> str:
-    """Remplace l'index de page dans l'URL de la 1ère page par
-    page_index. Ex: (".../recherche-fournisseur-0-ddr4.html", 2)
-    -> ".../recherche-fournisseur-2-ddr4.html"."""
-    return PAGE_INDEX_RE.sub(lambda m: f"-{page_index}-{m.group(2)}.html", first_page_url)
+def build_page_url(first_page_url: str, display_page: int) -> str:
+    """Construit l'URL de la page N (1 = première page affichée).
+
+    Particularité confirmée en conditions réelles sur Destockplus : la
+    première page est accessible via l'index "0" dans l'URL, et
+    l'index "1" est un DOUBLON de la page 0 (pas une vraie page 2) —
+    les pages suivantes reprennent une numérotation normale à partir de
+    "2". Le site "saute" donc le numéro 1. Ex: pages affichées
+    1, 2, 3, ... 10 correspondent aux URLs -0-, -2-, -3-, ... -10-.
+    """
+    url_index = 0 if display_page <= 1 else display_page
+    return PAGE_INDEX_RE.sub(lambda m: f"-{url_index}-{m.group(2)}.html", first_page_url)
 
 HEADERS = {
     "User-Agent": (
@@ -319,23 +325,23 @@ def scrape_type(memory_type: str, first_page_url: str) -> list[Lot]:
     all_lots: list[Lot] = []
     seen_ids: set = set()
 
-    for page_index in range(MAX_PAGES):
-        url = build_page_url(first_page_url, page_index)
+    for display_page in range(1, MAX_PAGES + 1):
+        url = build_page_url(first_page_url, display_page)
         soup = fetch(url, allow_missing=True)
 
         if soup is None:
-            print(f"[diag] {memory_type} page {page_index} -> 404, fin de pagination", file=sys.stderr)
+            print(f"[diag] {memory_type} page {display_page} -> 404, fin de pagination", file=sys.stderr)
             break
 
         page_ids = collect_ad_ids(soup)
         if not page_ids:
-            print(f"[diag] {memory_type} page {page_index} -> aucune annonce, fin de pagination", file=sys.stderr)
+            print(f"[diag] {memory_type} page {display_page} -> aucune annonce, fin de pagination", file=sys.stderr)
             break
 
         new_ids = page_ids - seen_ids
         if not new_ids:
             print(
-                f"[diag] {memory_type} page {page_index} -> {len(page_ids)} annonce(s), "
+                f"[diag] {memory_type} page {display_page} -> {len(page_ids)} annonce(s), "
                 "toutes déjà vues, fin de pagination",
                 file=sys.stderr,
             )
@@ -352,7 +358,7 @@ def scrape_type(memory_type: str, first_page_url: str) -> list[Lot]:
                 existing_ids.add(lot.id)
 
         print(
-            f"[diag] {memory_type} page {page_index} -> {len(new_ids)} nouvelle(s) annonce(s), "
+            f"[diag] {memory_type} page {display_page} -> {len(new_ids)} nouvelle(s) annonce(s), "
             f"{len(all_lots)} au total jusqu'ici",
             file=sys.stderr,
         )
