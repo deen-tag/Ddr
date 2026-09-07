@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SERGIO DDR — Lots RAM</title>
+<style>
+  :root {
+    --bg: #10131a;
+    --panel: #171b24;
+    --border: #262c3a;
+    --text: #e7e9ee;
+    --muted: #8890a3;
+    --accent: #5eead4;
+    --ddr4: #7dd3fc;
+    --ddr5: #c4b5fd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 32px 20px 60px;
+  }
+  header {
+    max-width: 1100px;
+    margin: 0 auto 28px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 650;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0;
+  }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  #status {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 40px 0;
+    text-align: center;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 14px;
+  }
+  thead th {
+    text-align: left;
+    padding: 12px 14px;
+    color: var(--muted);
+    font-weight: 550;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .title-cell a {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .title-cell a:hover { color: var(--accent); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge.ddr4 { background: rgba(125,211,252,0.12); color: var(--ddr4); }
+  .badge.ddr5 { background: rgba(196,181,253,0.12); color: var(--ddr5); }
+  .num { font-variant-numeric: tabular-nums; }
+  .price-per-go {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .empty {
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SERGIO DDR — Lots RAM</h1>
+  <p class="subtitle">Données extraites de Destockplus, mises à jour automatiquement</p>
+</header>
+
+<main>
+  <div id="status">Chargement des données…</div>
+  <table id="table" style="display:none;">
+    <thead>
+      <tr>
+        <th>Annonce</th>
+        <th>Type</th>
+        <th>Quantité</th>
+        <th>Capacité unité</th>
+        <th>Prix total</th>
+        <th>Prix / Go</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</main>
+
+<script>
+  const fmtEur = (n) => n == null ? "—" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  const fmtGo = (n) => n == null ? "—" : n + " Go";
+  const fmtInt = (n) => n == null ? "—" : n.toLocaleString("fr-FR");
+
+  fetch("data/destockplus.json")
+    .then((res) => {
+      if (!res.ok) throw new Error("Fichier JSON introuvable");
+      return res.json();
+    })
+    .then((lots) => {
+      const status = document.getElementById("status");
+      const table = document.getElementById("table");
+      const tbody = document.getElementById("tbody");
+
+      if (!lots || lots.length === 0) {
+        status.textContent = "Aucun lot trouvé pour le moment.";
+        return;
+      }
+
+      lots.forEach((lot) => {
+        const tr = document.createElement("tr");
+
+        const badgeClass = lot.memory_type === "DDR5" ? "ddr5" : "ddr4";
+
+        tr.innerHTML = `
+          <td class="title-cell"><a href="${lot.url}" target="_blank" rel="noopener">${lot.title}</a></td>
+          <td><span class="badge ${badgeClass}">${lot.memory_type}</span></td>
+          <td class="num">${fmtInt(lot.quantity)}</td>
+          <td class="num">${fmtGo(lot.unit_capacity_go)}</td>
+          <td class="num">${fmtEur(lot.price_total_eur)}${lot.price_is_per_unit ? " <span class=\"empty\">/u</span>" : ""}</td>
+          <td class="num price-per-go">${lot.price_per_go_eur != null ? fmtEur(lot.price_per_go_eur) : "—"}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      status.style.display = "none";
+      table.style.display = "table";
+    })
+    .catch((err) => {
+      document.getElementById("status").textContent =
+        "Impossible de charger les données (" + err.message + "). Vérifie que data/destockplus.json existe.";
+    });
+</script>
+
+</body>
+</html>
