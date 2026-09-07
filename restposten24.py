@@ -48,13 +48,25 @@ BASE_URL = "https://www.restposten24.de"
 # d'apparaître. On filtre ensuite strictement par titre, donc une
 # catégorie un peu large (Sonstige PC-Komponenten) ne pose pas de
 # problème : les annonces hors-sujet seront simplement ignorées.
-CATEGORY_PAGES = {
-    "RAM-Speicher": f"{BASE_URL}/Computer/RAM-Speicher/cat56_0.html",
-    "Sonstige PC-Komponenten": f"{BASE_URL}/Computer/Sonstige%20PC-Komponenten/cat59_0.html",
+#
+# Format d'URL confirmé par les logs de production (les anciennes URLs
+# statiques en .html type "/Computer/RAM-Speicher/cat56_0.html" ne
+# renvoient plus d'annonces) :
+#   /index.php?mod=rp24_global&mode=singlecat&func=cat&cat=<ID>&page=<N>&orderBy=offers_date
+CATEGORY_IDS = {
+    "RAM-Speicher": 56,
+    "Sonstige PC-Komponenten": 59,
 }
 
-# Nombre max de pages à suivre par catégorie (pagination "page=2, 3...").
-MAX_PAGES_PER_CATEGORY = 5
+# Nombre max de pages à suivre par catégorie.
+MAX_PAGES_PER_CATEGORY = 20
+
+
+def build_category_page_url(cat_id: int, page: int) -> str:
+    return (
+        f"{BASE_URL}/index.php?mod=rp24_global&mode=singlecat"
+        f"&func=cat&cat={cat_id}&page={page}&orderBy=offers_date"
+    )
 
 HEADERS = {
     "User-Agent": (
@@ -75,7 +87,7 @@ RE_PRICE_QTY = re.compile(
     re.IGNORECASE,
 )
 
-RE_NEXT_PAGE = re.compile(r"[?&]page=(\d+)")
+RE_NEXT_PAGE = re.compile(r"[?&]page=(\d+)")  # gardé pour référence, plus utilisé pour la pagination
 
 
 def fetch(url: str) -> Optional[BeautifulSoup]:
@@ -98,14 +110,13 @@ def extract_ad_id(href: str) -> str:
     return match.group(1) if match else href
 
 
-def find_next_page_url(soup: BeautifulSoup, current_url: str) -> Optional[str]:
-    for a in soup.find_all("a", href=True):
-        if RE_NEXT_PAGE.search(a["href"]) and (
-            a.get_text(strip=True) == "" or a.get_text(strip=True).isdigit() or "next" in a.get("rel", [])
-        ):
-            href = a["href"]
-            return href if href.startswith("http") else BASE_URL + href
-    return None
+def collect_ad_ids(soup: BeautifulSoup) -> set:
+    ids = set()
+    for link in soup.find_all("a", href=True):
+        href = link["href"]
+        if AD_LINK_RE.match(href):
+            ids.add(extract_ad_id(href))
+    return ids
 
 
 def parse_category_page(soup: BeautifulSoup, category_label: str) -> list:
@@ -201,19 +212,58 @@ def parse_category_page(soup: BeautifulSoup, category_label: str) -> list:
     return lots
 
 
+def scrape_category(label: str, cat_id: int) -> list:
+    """Parcourt toutes les pages d'une catégorie, en s'arrêtant dès
+    qu'une page échoue, ne contient plus d'annonce, ou ne contient que
+    des annonces déjà vues (fin réelle de la pagination). On boucle sur
+    des numéros de page explicites plutôt que de deviner un lien
+    "page suivante" dans le HTML, ce qui s'est révélé peu fiable en
+    conditions réelles (le site propose plusieurs liens de pagination
+    qui peuvent faire revenir en arrière)."""
+    all_lots = []
+    seen_ids: set = set()
+
+    for page_num in range(1, MAX_PAGES_PER_CATEGORY + 1):
+        url = build_category_page_url(cat_id, page_num)
+        soup = fetch(url)
+        if soup is None:
+            print(f"[diag][{label}] page {page_num} -> échec de la requête, fin de pagination", file=sys.stderr)
+            break
+
+        page_ids = collect_ad_ids(soup)
+        if not page_ids:
+            print(f"[diag][{label}] page {page_num} -> aucune annonce, fin de pagination", file=sys.stderr)
+            break
+
+        new_ids = page_ids - seen_ids
+        if not new_ids:
+            print(
+                f"[diag][{label}] page {page_num} -> {len(page_ids)} annonce(s), toutes déjà vues, fin de pagination",
+                file=sys.stderr,
+            )
+            break
+
+        seen_ids |= page_ids
+        page_lots = parse_category_page(soup, label)
+        existing_ids = {lot.id for lot in all_lots}
+        for lot in page_lots:
+            if lot.id not in existing_ids:
+                all_lots.append(lot)
+                existing_ids.add(lot.id)
+
+        print(
+            f"[diag][{label}] page {page_num} -> {len(new_ids)} nouvelle(s) annonce(s), "
+            f"{len(all_lots)} lot(s) DDR4/DDR5 au total jusqu'ici",
+            file=sys.stderr,
+        )
+
+    return all_lots
+
+
 def scrape_all() -> list:
     all_lots = []
-    for label, start_url in CATEGORY_PAGES.items():
-        url = start_url
-        for page_num in range(1, MAX_PAGES_PER_CATEGORY + 1):
-            soup = fetch(url)
-            if soup is None:
-                break
-            all_lots.extend(parse_category_page(soup, label))
-            next_url = find_next_page_url(soup, url)
-            if not next_url or next_url == url:
-                break
-            url = next_url
+    for label, cat_id in CATEGORY_IDS.items():
+        all_lots.extend(scrape_category(label, cat_id))
     return all_lots
 
 
