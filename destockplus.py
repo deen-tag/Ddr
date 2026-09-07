@@ -92,10 +92,12 @@ def fetch(url: str) -> BeautifulSoup:
         file=sys.stderr,
     )
     if not ad_links:
-        # On imprime les 500 premiers caractères pour voir ce qu'on a vraiment reçu
-        # (page de blocage / captcha / structure différente, etc.)
-        print("[diag] Aucun lien d'annonce trouvé. Aperçu du HTML reçu :", file=sys.stderr)
-        print(resp.text[:1500], file=sys.stderr)
+        # On affiche un échantillon des vrais liens <a> trouvés sur la page
+        # pour identifier le format réel utilisé par Destockplus aujourd'hui.
+        print("[diag] Aucun lien d'annonce trouvé. Échantillon des hrefs bruts :", file=sys.stderr)
+        for a in all_links[:30]:
+            texte = a.get_text(strip=True)[:40]
+            print(f"[diag]   href={a['href']!r}  texte={texte!r}", file=sys.stderr)
     return soup
 
 
