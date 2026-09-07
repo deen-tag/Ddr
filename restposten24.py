@@ -1,26 +1,23 @@
 """
-Scraper Restposten24 pour SERGIO DDR.
+Scraper Restposten24 / Stocklots24 pour SERGIO DDR.
 
-Restposten24 est une place de marché B2B de déstockage/liquidation
-(Allemagne, avec des déclinaisons dans plusieurs pays européens :
-restposten24.at, restposten24.ch, stocklots24.fr/it/uk/nl/pl/es/hu...).
-Ce script cible la version allemande (.de), qui a le plus gros
-catalogue, et est en HTML statique (pas de JS nécessaire pour lire le
-contenu -> requests + BeautifulSoup suffit).
+Restposten24 est une place de marché B2B de déstockage/liquidation,
+avec des déclinaisons par pays qui partagent le même logiciel et les
+mêmes ID de catégorie (vérifié manuellement le 07/09/2026 : la
+catégorie "RAM-Speicher" = cat56 sur restposten24.de, et la catégorie
+"Mémoire RAM" = cat56 aussi sur stocklots24.fr). On boucle donc sur
+plusieurs domaines pour élargir la couverture européenne.
 
 Usage :
     python restposten24.py            -> écrit data/restposten24.json
     python restposten24.py --stdout   -> affiche le JSON sur stdout
 
 Notes :
-- La structure exacte des blocs d'annonces n'a pas pu être testée en
-  conditions réelles avec le vrai parseur (pas d'accès réseau dans
-  l'environnement où ce script a été écrit). Le parsing repose sur les
-  liens d'annonces (motif /<slug>/<id-numerique>) et sur un texte du
-  type "12,50 €pro Stück, 500 Stück verfügbar" trouvé à proximité,
-  d'après un exemplaire de page récupéré manuellement. Si Restposten24
-  change son gabarit, ajuster AD_LINK_RE / RE_PRICE_QTY ci-dessous (les
-  diagnostics stderr aident à repérer le nouveau format).
+- Le stock de chaque catégorie change en continu (annonces qui
+  expirent, nouvelles annonces). Un domaine qui ne renvoie rien à un
+  instant T peut très bien avoir des annonces plus tard : ce n'est pas
+  forcément un bug, voir les diagnostics [diag] si un domaine reste
+  vide sur plusieurs runs.
 """
 
 import argparse
@@ -42,7 +39,16 @@ from common import (
     parse_number,
 )
 
-BASE_URL = "https://www.restposten24.de"
+# Déclinaisons par pays du même logiciel de marketplace (mêmes ID de
+# catégorie, juste un domaine et une langue différents). On peut en
+# retirer/ajouter selon ce que les diagnostics montrent au fil des runs.
+DOMAINS = {
+    "DE": "www.restposten24.de",
+    "FR": "www.stocklots24.fr",
+    "IT": "www.stocklots24.it",
+    "UK": "www.stocklots24.uk",
+    "NL": "www.stocklots24.nl",
+}
 
 # Catégories informatique où des lots de RAM DDR4/DDR5 sont susceptibles
 # d'apparaître. On filtre ensuite strictement par titre, donc une
@@ -53,26 +59,17 @@ BASE_URL = "https://www.restposten24.de"
 # du HTML, sans JS) :
 #   /index.php?cat=<ID>&func=cat&mod=rp24_global&mode=singlecat
 # renvoie bien les annonces en HTML côté serveur pour la page 1.
-#
-# L'ancienne version de ce script ajoutait "&page=<N>&orderBy=offers_date"
-# dès la première page, ce qui semble faire échouer le rendu serveur
-# (page vide malgré un statut 200) : c'est très probablement la cause du
-# "0 résultat" observé en production. On n'ajoute donc "page" que pour
-# les pages 2 et suivantes, et on retire orderBy. Si "page=2" s'avère
-# lui aussi incorrect (à vérifier avec les logs [diag] ci-dessous), les
-# noms de paramètres à essayer en premier sont : "p", "seite", ou un
-# numéro dans le chemin plutôt qu'en query string.
 CATEGORY_IDS = {
     "RAM-Speicher": 56,
     "Sonstige PC-Komponenten": 59,
 }
 
-# Nombre max de pages à suivre par catégorie.
+# Nombre max de pages à suivre par catégorie et par domaine.
 MAX_PAGES_PER_CATEGORY = 20
 
 
-def build_category_page_url(cat_id: int, page: int) -> str:
-    url = f"{BASE_URL}/index.php?cat={cat_id}&func=cat&mod=rp24_global&mode=singlecat"
+def build_category_page_url(domain: str, cat_id: int, page: int) -> str:
+    url = f"https://{domain}/index.php?cat={cat_id}&func=cat&mod=rp24_global&mode=singlecat"
     if page > 1:
         url += f"&page={page}"
     return url
@@ -151,7 +148,7 @@ def collect_ad_ids(soup: BeautifulSoup) -> set:
     return ids
 
 
-def parse_category_page(soup: BeautifulSoup, category_label: str) -> list:
+def parse_category_page(soup: BeautifulSoup, category_label: str, domain: str, country_code: str) -> list:
     lots = []
     now = datetime.now(timezone.utc).isoformat()
 
@@ -226,7 +223,7 @@ def parse_category_page(soup: BeautifulSoup, category_label: str) -> list:
 
         lots.append(
             Lot(
-                id=f"restposten24-{ad_id}",
+                id=f"restposten24-{country_code.lower()}-{ad_id}",
                 title=title,
                 memory_type=memory_type,
                 quantity=quantity,
@@ -235,8 +232,8 @@ def parse_category_page(soup: BeautifulSoup, category_label: str) -> list:
                 price_total_eur=price_total,
                 price_is_per_unit=price_is_per_unit,
                 price_per_go_eur=price_per_go,
-                source="Restposten24",
-                url=href if href.startswith("http") else BASE_URL + href,
+                source=f"Restposten24 ({country_code})",
+                url=href if href.startswith("http") else f"https://{domain}{href}",
                 scraped_at=now,
             )
         )
@@ -244,39 +241,37 @@ def parse_category_page(soup: BeautifulSoup, category_label: str) -> list:
     return lots
 
 
-def scrape_category(label: str, cat_id: int) -> list:
-    """Parcourt toutes les pages d'une catégorie, en s'arrêtant dès
-    qu'une page échoue, ne contient plus d'annonce, ou ne contient que
-    des annonces déjà vues (fin réelle de la pagination). On boucle sur
-    des numéros de page explicites plutôt que de deviner un lien
-    "page suivante" dans le HTML, ce qui s'est révélé peu fiable en
-    conditions réelles (le site propose plusieurs liens de pagination
-    qui peuvent faire revenir en arrière)."""
+def scrape_category(country_code: str, domain: str, label: str, cat_id: int) -> list:
+    """Parcourt toutes les pages d'une catégorie sur un domaine donné,
+    en s'arrêtant dès qu'une page échoue, ne contient plus d'annonce,
+    ou ne contient que des annonces déjà vues (fin réelle de la
+    pagination)."""
     all_lots = []
     seen_ids: set = set()
+    tag = f"{country_code}/{label}"
 
     for page_num in range(1, MAX_PAGES_PER_CATEGORY + 1):
-        url = build_category_page_url(cat_id, page_num)
+        url = build_category_page_url(domain, cat_id, page_num)
         soup = fetch(url)
         if soup is None:
-            print(f"[diag][{label}] page {page_num} -> échec de la requête, fin de pagination", file=sys.stderr)
+            print(f"[diag][{tag}] page {page_num} -> échec de la requête, fin de pagination", file=sys.stderr)
             break
 
         page_ids = collect_ad_ids(soup)
         if not page_ids:
-            print(f"[diag][{label}] page {page_num} -> aucune annonce, fin de pagination", file=sys.stderr)
+            print(f"[diag][{tag}] page {page_num} -> aucune annonce, fin de pagination", file=sys.stderr)
             break
 
         new_ids = page_ids - seen_ids
         if not new_ids:
             print(
-                f"[diag][{label}] page {page_num} -> {len(page_ids)} annonce(s), toutes déjà vues, fin de pagination",
+                f"[diag][{tag}] page {page_num} -> {len(page_ids)} annonce(s), toutes déjà vues, fin de pagination",
                 file=sys.stderr,
             )
             break
 
         seen_ids |= page_ids
-        page_lots = parse_category_page(soup, label)
+        page_lots = parse_category_page(soup, tag, domain, country_code)
         existing_ids = {lot.id for lot in all_lots}
         for lot in page_lots:
             if lot.id not in existing_ids:
@@ -284,7 +279,7 @@ def scrape_category(label: str, cat_id: int) -> list:
                 existing_ids.add(lot.id)
 
         print(
-            f"[diag][{label}] page {page_num} -> {len(new_ids)} nouvelle(s) annonce(s), "
+            f"[diag][{tag}] page {page_num} -> {len(new_ids)} nouvelle(s) annonce(s), "
             f"{len(all_lots)} lot(s) DDR4/DDR5 au total jusqu'ici",
             file=sys.stderr,
         )
@@ -294,8 +289,10 @@ def scrape_category(label: str, cat_id: int) -> list:
 
 def scrape_all() -> list:
     all_lots = []
-    for label, cat_id in CATEGORY_IDS.items():
-        all_lots.extend(scrape_category(label, cat_id))
+    for country_code, domain in DOMAINS.items():
+        print(f"[diag] === Domaine {country_code} ({domain}) ===", file=sys.stderr)
+        for label, cat_id in CATEGORY_IDS.items():
+            all_lots.extend(scrape_category(country_code, domain, label, cat_id))
     return all_lots
 
 
