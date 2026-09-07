@@ -170,6 +170,7 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
         href_by_id.setdefault(ad_id, href)
 
     debug_shown = 0
+    html_dump_shown = 0
 
     for ad_id, group_links in groups.items():
         href = href_by_id[ad_id]
@@ -212,6 +213,15 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
                 file=sys.stderr,
             )
             debug_shown += 1
+
+        if html_dump_shown < 2 and not prix_match:
+            print(
+                f"[diag] --- HTML complet du conteneur pour {title!r} ---",
+                file=sys.stderr,
+            )
+            print(str(container)[:3000], file=sys.stderr)
+            print("[diag] --- fin HTML conteneur ---", file=sys.stderr)
+            html_dump_shown += 1
 
         quantity = int(parse_number(qte_match.group(1))) if qte_match else None
         price_total = parse_number(prix_match.group(1)) if prix_match else None
