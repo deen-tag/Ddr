@@ -44,10 +44,29 @@ BASE_URL = "https://www.destockplus.com"
 
 # Une page de recherche par type de mémoire. On pourra en ajouter
 # (ex: "ddr4-sodimm", "ddr5-ecc") si on veut affiner plus tard.
+# Le "0" dans l'URL est l'index de page (0 = première page). On s'en
+# sert comme gabarit pour générer les pages suivantes (1, 2, 3, ...).
 SEARCH_PAGES = {
     "DDR4": f"{BASE_URL}/acheter/recherche-fournisseur-0-ddr4.html",
     "DDR5": f"{BASE_URL}/acheter/recherche-fournisseur-0-ddr5.html",
 }
+
+# Filet de sécurité : nombre maximum de pages qu'on ira chercher pour un
+# même type de mémoire, même si le site semble en proposer indéfiniment.
+# Évite une boucle infinie / un scraping trop long en cas de mauvaise
+# détection de la fin de pagination.
+MAX_PAGES = 30
+
+# Motif pour repérer l'index de page dans l'URL (le nombre juste avant
+# "-ddr4.html" ou "-ddr5.html") et pouvoir le remplacer.
+PAGE_INDEX_RE = re.compile(r"-(\d+)-(ddr[45])\.html$")
+
+
+def build_page_url(first_page_url: str, page_index: int) -> str:
+    """Remplace l'index de page dans l'URL de la 1ère page par
+    page_index. Ex: (".../recherche-fournisseur-0-ddr4.html", 2)
+    -> ".../recherche-fournisseur-2-ddr4.html"."""
+    return PAGE_INDEX_RE.sub(lambda m: f"-{page_index}-{m.group(2)}.html", first_page_url)
 
 HEADERS = {
     "User-Agent": (
@@ -73,13 +92,19 @@ RE_PRIX_NU = re.compile(r"([\d]{1,3}(?:[\s.,]\d{3})*(?:[.,]\d{1,2})?)\s*€")
 RE_CAPACITY_GO = re.compile(r"(\d+)\s*Go", re.IGNORECASE)
 
 
-def fetch(url: str) -> BeautifulSoup:
+def fetch(url: str, allow_missing: bool = False) -> Optional[BeautifulSoup]:
+    """Récupère et parse une page. Si allow_missing=True, une réponse
+    404 (page de pagination inexistante = fin de pagination) renvoie
+    None au lieu de lever une exception ; les autres erreurs HTTP
+    continuent de lever normalement."""
     resp = requests.get(url, headers=HEADERS, timeout=20)
     print(
         f"[diag] GET {url} -> status={resp.status_code} "
         f"taille={len(resp.text)} caractères",
         file=sys.stderr,
     )
+    if allow_missing and resp.status_code == 404:
+        return None
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
     all_links = soup.find_all("a", href=True)
@@ -274,11 +299,71 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
     return lots
 
 
+def collect_ad_ids(soup: BeautifulSoup) -> set:
+    ids = set()
+    for link in soup.find_all("a", href=True):
+        href = link["href"]
+        if AD_LINK_RE.match(href):
+            ids.add(extract_ad_id(href))
+    return ids
+
+
+def scrape_type(memory_type: str, first_page_url: str) -> list[Lot]:
+    """Parcourt toutes les pages de résultats pour un type de mémoire
+    (DDR4 ou DDR5), en s'arrêtant dès qu'une page :
+    - renvoie une 404 (page de pagination inexistante),
+    - ne contient plus aucune annonce,
+    - ou ne contient que des annonces déjà vues sur les pages
+      précédentes (signe qu'on a bouclé / atteint la fin réelle).
+    Un plafond MAX_PAGES protège contre une boucle infinie."""
+    all_lots: list[Lot] = []
+    seen_ids: set = set()
+
+    for page_index in range(MAX_PAGES):
+        url = build_page_url(first_page_url, page_index)
+        soup = fetch(url, allow_missing=True)
+
+        if soup is None:
+            print(f"[diag] {memory_type} page {page_index} -> 404, fin de pagination", file=sys.stderr)
+            break
+
+        page_ids = collect_ad_ids(soup)
+        if not page_ids:
+            print(f"[diag] {memory_type} page {page_index} -> aucune annonce, fin de pagination", file=sys.stderr)
+            break
+
+        new_ids = page_ids - seen_ids
+        if not new_ids:
+            print(
+                f"[diag] {memory_type} page {page_index} -> {len(page_ids)} annonce(s), "
+                "toutes déjà vues, fin de pagination",
+                file=sys.stderr,
+            )
+            break
+
+        seen_ids |= page_ids
+        page_lots = parse_search_page(soup, memory_type, url)
+        # On ne garde que les lots dont l'id n'a pas déjà été ajouté
+        # (au cas où une même annonce apparaîtrait sur deux pages).
+        existing_ids = {lot.id for lot in all_lots}
+        for lot in page_lots:
+            if lot.id not in existing_ids:
+                all_lots.append(lot)
+                existing_ids.add(lot.id)
+
+        print(
+            f"[diag] {memory_type} page {page_index} -> {len(new_ids)} nouvelle(s) annonce(s), "
+            f"{len(all_lots)} au total jusqu'ici",
+            file=sys.stderr,
+        )
+
+    return all_lots
+
+
 def scrape_all() -> list[Lot]:
     all_lots: list[Lot] = []
     for memory_type, url in SEARCH_PAGES.items():
-        soup = fetch(url)
-        all_lots.extend(parse_search_page(soup, memory_type, url))
+        all_lots.extend(scrape_type(memory_type, url))
     return all_lots
 
 
