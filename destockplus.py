@@ -49,8 +49,10 @@ HEADERS = {
     "Accept-Language": "fr-FR,fr;q=0.9",
 }
 
-# Lien vers une annonce : /acheter/c-904002-lot-ram-4go-ddr4.html
-AD_LINK_RE = re.compile(r"^/acheter/c-\d+-.+\.html$")
+# Lien vers une annonce : soit relatif (/acheter/c-904002-...html), soit
+# absolu (https://www.destockplus.com/acheter/c-904002-...html) — le site
+# utilise en réalité des liens absolus.
+AD_LINK_RE = re.compile(r"^(?:https://www\.destockplus\.com)?/acheter/c-\d+-.+\.html$")
 
 RE_QTE = re.compile(r"Quantit[ée]\s*:\s*([\d\s]+)", re.IGNORECASE)
 RE_PRIX = re.compile(
