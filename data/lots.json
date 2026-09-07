@@ -11,7 +11,7 @@
     "price_per_go_eur": 3.125,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-904002-lot-ram-4go-ddr4.html",
-    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
+    "scraped_at": "2026-09-07T20:36:06.302299+00:00",
     "is_new": false
   },
   {
@@ -26,7 +26,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930962-ram-portable-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
+    "scraped_at": "2026-09-07T20:36:06.302299+00:00",
     "is_new": false
   },
   {
@@ -41,7 +41,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930960-ram-fixe-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
+    "scraped_at": "2026-09-07T20:36:06.302299+00:00",
     "is_new": false
   },
   {
@@ -56,7 +56,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930959-ram-fixe-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
+    "scraped_at": "2026-09-07T20:36:06.302299+00:00",
     "is_new": false
   },
   {
@@ -71,7 +71,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930961-ram-portable-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:36.503440+00:00",
+    "scraped_at": "2026-09-07T20:36:06.302299+00:00",
     "is_new": false
   },
   {
@@ -86,8 +86,8 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-960507-asus-zenbook-14-oled-un5401q-i7.html",
-    "scraped_at": "2026-09-07T20:09:40.730687+00:00",
-    "is_new": true
+    "scraped_at": "2026-09-07T20:36:12.527001+00:00",
+    "is_new": false
   },
   {
     "id": "destockplus-960506",
@@ -101,8 +101,8 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-960506-asus-rog-strix-g512l-vhn146t-i7.html",
-    "scraped_at": "2026-09-07T20:09:40.730687+00:00",
-    "is_new": true
+    "scraped_at": "2026-09-07T20:36:12.527001+00:00",
+    "is_new": false
   },
   {
     "id": "destockplus-930962",
@@ -116,7 +116,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930962-ram-portable-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
+    "scraped_at": "2026-09-07T20:36:17.167720+00:00",
     "is_new": false
   },
   {
@@ -131,7 +131,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930960-ram-fixe-ddr4-8go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
+    "scraped_at": "2026-09-07T20:36:17.167720+00:00",
     "is_new": false
   },
   {
@@ -146,7 +146,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930959-ram-fixe-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
+    "scraped_at": "2026-09-07T20:36:17.167720+00:00",
     "is_new": false
   },
   {
@@ -161,7 +161,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-930961-ram-portable-ddr4-4go-tester-ok.html",
-    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
+    "scraped_at": "2026-09-07T20:36:17.167720+00:00",
     "is_new": false
   },
   {
@@ -176,7 +176,7 @@
     "price_per_go_eur": null,
     "source": "Destockplus",
     "url": "https://www.destockplus.com/acheter/c-970566-lot-ram-serveur-samsung-ddr5-rdimm.html",
-    "scraped_at": "2026-09-07T20:09:43.639089+00:00",
+    "scraped_at": "2026-09-07T20:36:17.167720+00:00",
     "is_new": false
   }
 ]
