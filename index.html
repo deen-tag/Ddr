@@ -98,11 +98,17 @@
     color: var(--muted);
     font-size: 12px;
   }
+  .badge.new {
+    background: rgba(94,234,212,0.15);
+    color: var(--accent);
+    margin-left: 6px;
+  }
   .filters {
     display: flex;
     gap: 10px;
     margin-bottom: 16px;
     flex-wrap: wrap;
+    align-items: center;
   }
   .filters select {
     background: var(--panel);
@@ -112,6 +118,31 @@
     padding: 6px 10px;
     font-size: 13px;
   }
+  .filters label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+  }  .refresh-btn {
+    background: var(--accent);
+    color: #0a0f14;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  #refresh-status {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -119,6 +150,10 @@
 <header>
   <h1>SERGIO DDR — Lots RAM</h1>
   <p class="subtitle">Données extraites de plusieurs sites de déstockage européens, mises à jour automatiquement</p>
+  <div style="margin-top:12px; display:flex; align-items:center; gap:10px;">
+    <button id="refresh-btn" class="refresh-btn">🔄 Lancer un nouveau scraping</button>
+    <span id="refresh-status"></span>
+  </div>
 </header>
 
 <main>
@@ -132,6 +167,10 @@
       <option value="DDR4">DDR4 uniquement</option>
       <option value="DDR5">DDR5 uniquement</option>
     </select>
+    <label>
+      <input type="checkbox" id="filter-new" />
+      Nouvelles annonces uniquement
+    </label>
   </div>
   <table id="table" style="display:none;">
     <thead>
@@ -156,25 +195,52 @@
 
   let allLots = [];
 
+  const refreshBtn = document.getElementById("refresh-btn");
+  const refreshStatus = document.getElementById("refresh-status");
+
+  refreshBtn.addEventListener("click", async () => {
+    refreshBtn.disabled = true;
+    refreshStatus.textContent = "Déclenchement du scraping…";
+    try {
+      const res = await fetch("/api/trigger-scrape", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        refreshStatus.textContent =
+          "Scraping lancé sur GitHub, ça prend ~1 minute. Recharge cette page dans un instant pour voir les nouveautés.";
+      } else {
+        refreshStatus.textContent = "Erreur : " + (data.error || "impossible de lancer le scraping.");
+      }
+    } catch (err) {
+      refreshStatus.textContent = "Erreur réseau : " + err.message;
+    } finally {
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+      }, 15000);
+    }
+  });
+
   function renderLots() {
     const tbody = document.getElementById("tbody");
     const sourceFilter = document.getElementById("filter-source").value;
     const typeFilter = document.getElementById("filter-type").value;
+    const newOnly = document.getElementById("filter-new").checked;
 
     tbody.innerHTML = "";
 
     const filtered = allLots.filter((lot) => {
       if (sourceFilter && lot.source !== sourceFilter) return false;
       if (typeFilter && lot.memory_type !== typeFilter) return false;
+      if (newOnly && !lot.is_new) return false;
       return true;
     });
 
     filtered.forEach((lot) => {
       const tr = document.createElement("tr");
       const badgeClass = lot.memory_type === "DDR5" ? "ddr5" : "ddr4";
+      const newBadge = lot.is_new ? '<span class="badge new">NOUVEAU</span>' : "";
 
       tr.innerHTML = `
-        <td class="title-cell"><a href="${lot.url}" target="_blank" rel="noopener">${lot.title}</a></td>
+        <td class="title-cell"><a href="${lot.url}" target="_blank" rel="noopener">${lot.title}</a>${newBadge}</td>
         <td class="source-badge">${lot.source}</td>
         <td><span class="badge ${badgeClass}">${lot.memory_type}</span></td>
         <td class="num">${fmtInt(lot.quantity)}</td>
@@ -214,6 +280,7 @@
 
       document.getElementById("filter-source").addEventListener("change", renderLots);
       document.getElementById("filter-type").addEventListener("change", renderLots);
+      document.getElementById("filter-new").addEventListener("change", renderLots);
 
       renderLots();
 

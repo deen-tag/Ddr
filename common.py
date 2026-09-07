@@ -88,6 +88,7 @@ class Lot:
     source: str
     url: str
     scraped_at: str
+    is_new: bool = False
 
 
 def compute_derived_fields(
