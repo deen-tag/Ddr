@@ -129,22 +129,52 @@ def extract_ad_id(href: str) -> str:
     return match.group(1) if match else href
 
 
+def best_title_for_group(links: list) -> str:
+    """Parmi tous les <a> qui pointent vers la même annonce (miniature
+    photo, titre, etc.), choisit le texte le plus probable pour être le
+    titre du produit : pas vide, pas juste un nombre, le plus long."""
+    candidates = []
+    for link in links:
+        text = link.get_text(strip=True)
+        if text:
+            candidates.append(text)
+        title_attr = link.get("title", "").strip()
+        if title_attr:
+            candidates.append(title_attr)
+        for img in link.find_all("img"):
+            alt = (img.get("alt") or "").strip()
+            if alt:
+                candidates.append(alt)
+
+    # On préfère un texte "réel" (pas juste un nombre) et le plus long
+    real_candidates = [c for c in candidates if not c.isdigit()]
+    pool = real_candidates or candidates
+    return max(pool, key=len) if pool else ""
+
+
 def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) -> list[Lot]:
     lots: list[Lot] = []
-    seen_ids = set()
     now = datetime.now(timezone.utc).isoformat()
 
+    # 1er passage : on regroupe tous les <a> d'annonce par id, car une même
+    # annonce a plusieurs liens (miniature, titre, etc.) sur la page de
+    # résultats.
+    groups: dict[str, list] = {}
+    href_by_id: dict[str, str] = {}
     for link in soup.find_all("a", href=True):
         href = link["href"]
         if not AD_LINK_RE.match(href):
             continue
-
         ad_id = extract_ad_id(href)
-        if ad_id in seen_ids:
-            continue
-        seen_ids.add(ad_id)
+        groups.setdefault(ad_id, []).append(link)
+        href_by_id.setdefault(ad_id, href)
 
-        title = link.get_text(strip=True) or link.get("title", "")
+    debug_shown = 0
+
+    for ad_id, group_links in groups.items():
+        href = href_by_id[ad_id]
+        title = best_title_for_group(group_links)
+
         if not title:
             continue
 
@@ -153,14 +183,17 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
         # qui *contiennent* de la DDR4/DDR5, pas juste des barrettes).
         title_lower = title.lower()
         if "ram" not in title_lower and "ddr" not in title_lower:
+            if debug_shown < 8:
+                print(f"[diag] Titre ignoré (pas 'ram'/'ddr') : {title!r}", file=sys.stderr)
+                debug_shown += 1
             continue
 
         # On cherche le texte "Quantité / Prix" dans le voisinage du
         # lien (le conteneur parent de l'annonce), en remontant jusqu'à
         # trouver un bloc qui contient ces deux informations.
-        container = link
+        container = group_links[0]
         context_text = ""
-        for _ in range(5):
+        for _ in range(6):
             if container.parent is None:
                 break
             container = container.parent
@@ -170,6 +203,15 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
 
         qte_match = RE_QTE.search(context_text)
         prix_match = RE_PRIX.search(context_text)
+
+        if debug_shown < 8:
+            print(
+                f"[diag] Annonce gardée : titre={title!r} "
+                f"qte_trouvee={bool(qte_match)} prix_trouve={bool(prix_match)} "
+                f"contexte(200c)={context_text[:200]!r}",
+                file=sys.stderr,
+            )
+            debug_shown += 1
 
         quantity = int(parse_number(qte_match.group(1))) if qte_match else None
         price_total = parse_number(prix_match.group(1)) if prix_match else None
