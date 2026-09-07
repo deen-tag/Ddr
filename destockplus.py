@@ -92,12 +92,21 @@ def fetch(url: str) -> BeautifulSoup:
         file=sys.stderr,
     )
     if not ad_links:
-        # On affiche un échantillon des vrais liens <a> trouvés sur la page
-        # pour identifier le format réel utilisé par Destockplus aujourd'hui.
-        print("[diag] Aucun lien d'annonce trouvé. Échantillon des hrefs bruts :", file=sys.stderr)
-        for a in all_links[:30]:
-            texte = a.get_text(strip=True)[:40]
-            print(f"[diag]   href={a['href']!r}  texte={texte!r}", file=sys.stderr)
+        # Les 30 premiers liens sont souvent juste le menu de navigation
+        # (toujours les mêmes catégories). Pour repérer le vrai format des
+        # annonces, on regroupe TOUS les liens par "forme" (chiffres ->
+        # remplacés par #) et on affiche un exemple par forme distincte.
+        print("[diag] Aucun lien d'annonce trouvé. Formes d'URL distinctes trouvées :", file=sys.stderr)
+        shapes = {}
+        for a in all_links:
+            href = a["href"]
+            shape = re.sub(r"\d+", "#", href)
+            if shape not in shapes:
+                texte = a.get_text(strip=True)[:40]
+                shapes[shape] = (href, texte)
+        for shape, (href, texte) in shapes.items():
+            print(f"[diag]   forme={shape!r}", file=sys.stderr)
+            print(f"[diag]     exemple href={href!r}  texte={texte!r}", file=sys.stderr)
     return soup
 
 
