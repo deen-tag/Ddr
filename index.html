@@ -94,21 +94,50 @@
   .empty {
     color: var(--muted);
   }
+  .source-badge {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .filters select {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>SERGIO DDR — Lots RAM</h1>
-  <p class="subtitle">Données extraites de Destockplus, mises à jour automatiquement</p>
+  <p class="subtitle">Données extraites de plusieurs sites de déstockage européens, mises à jour automatiquement</p>
 </header>
 
 <main>
   <div id="status">Chargement des données…</div>
+  <div class="filters" id="filters" style="display:none;">
+    <select id="filter-source">
+      <option value="">Toutes les sources</option>
+    </select>
+    <select id="filter-type">
+      <option value="">DDR4 + DDR5</option>
+      <option value="DDR4">DDR4 uniquement</option>
+      <option value="DDR5">DDR5 uniquement</option>
+    </select>
+  </div>
   <table id="table" style="display:none;">
     <thead>
       <tr>
         <th>Annonce</th>
+        <th>Source</th>
         <th>Type</th>
         <th>Quantité</th>
         <th>Capacité unité</th>
@@ -125,7 +154,39 @@
   const fmtGo = (n) => n == null ? "—" : n + " Go";
   const fmtInt = (n) => n == null ? "—" : n.toLocaleString("fr-FR");
 
-  fetch("data/destockplus.json")
+  let allLots = [];
+
+  function renderLots() {
+    const tbody = document.getElementById("tbody");
+    const sourceFilter = document.getElementById("filter-source").value;
+    const typeFilter = document.getElementById("filter-type").value;
+
+    tbody.innerHTML = "";
+
+    const filtered = allLots.filter((lot) => {
+      if (sourceFilter && lot.source !== sourceFilter) return false;
+      if (typeFilter && lot.memory_type !== typeFilter) return false;
+      return true;
+    });
+
+    filtered.forEach((lot) => {
+      const tr = document.createElement("tr");
+      const badgeClass = lot.memory_type === "DDR5" ? "ddr5" : "ddr4";
+
+      tr.innerHTML = `
+        <td class="title-cell"><a href="${lot.url}" target="_blank" rel="noopener">${lot.title}</a></td>
+        <td class="source-badge">${lot.source}</td>
+        <td><span class="badge ${badgeClass}">${lot.memory_type}</span></td>
+        <td class="num">${fmtInt(lot.quantity)}</td>
+        <td class="num">${fmtGo(lot.unit_capacity_go)}</td>
+        <td class="num">${fmtEur(lot.price_total_eur)}${lot.price_is_per_unit ? " <span class=\"empty\">/u</span>" : ""}</td>
+        <td class="num price-per-go">${lot.price_per_go_eur != null ? fmtEur(lot.price_per_go_eur) : "—"}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  fetch("data/lots.json")
     .then((res) => {
       if (!res.ok) throw new Error("Fichier JSON introuvable");
       return res.json();
@@ -133,35 +194,36 @@
     .then((lots) => {
       const status = document.getElementById("status");
       const table = document.getElementById("table");
-      const tbody = document.getElementById("tbody");
+      const filters = document.getElementById("filters");
 
       if (!lots || lots.length === 0) {
         status.textContent = "Aucun lot trouvé pour le moment.";
         return;
       }
 
-      lots.forEach((lot) => {
-        const tr = document.createElement("tr");
+      allLots = lots;
 
-        const badgeClass = lot.memory_type === "DDR5" ? "ddr5" : "ddr4";
-
-        tr.innerHTML = `
-          <td class="title-cell"><a href="${lot.url}" target="_blank" rel="noopener">${lot.title}</a></td>
-          <td><span class="badge ${badgeClass}">${lot.memory_type}</span></td>
-          <td class="num">${fmtInt(lot.quantity)}</td>
-          <td class="num">${fmtGo(lot.unit_capacity_go)}</td>
-          <td class="num">${fmtEur(lot.price_total_eur)}${lot.price_is_per_unit ? " <span class=\"empty\">/u</span>" : ""}</td>
-          <td class="num price-per-go">${lot.price_per_go_eur != null ? fmtEur(lot.price_per_go_eur) : "—"}</td>
-        `;
-        tbody.appendChild(tr);
+      const sourceSelect = document.getElementById("filter-source");
+      const sources = [...new Set(lots.map((l) => l.source))].sort();
+      sources.forEach((src) => {
+        const opt = document.createElement("option");
+        opt.value = src;
+        opt.textContent = src;
+        sourceSelect.appendChild(opt);
       });
 
+      document.getElementById("filter-source").addEventListener("change", renderLots);
+      document.getElementById("filter-type").addEventListener("change", renderLots);
+
+      renderLots();
+
       status.style.display = "none";
+      filters.style.display = "flex";
       table.style.display = "table";
     })
     .catch((err) => {
       document.getElementById("status").textContent =
-        "Impossible de charger les données (" + err.message + "). Vérifie que data/destockplus.json existe.";
+        "Impossible de charger les données (" + err.message + "). Vérifie que data/lots.json existe.";
     });
 </script>
 

@@ -25,12 +25,20 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
+
+from common import (
+    Lot,
+    compute_derived_fields,
+    detect_memory_type,
+    is_relevant_ddr_title,
+    parse_number as common_parse_number,
+)
 
 BASE_URL = "https://www.destockplus.com"
 
@@ -63,22 +71,6 @@ RE_PRIX = re.compile(
 # page de résultats (à confirmer via les diagnostics).
 RE_PRIX_NU = re.compile(r"([\d]{1,3}(?:[\s.,]\d{3})*(?:[.,]\d{1,2})?)\s*€")
 RE_CAPACITY_GO = re.compile(r"(\d+)\s*Go", re.IGNORECASE)
-
-
-@dataclass
-class Lot:
-    id: str
-    title: str
-    memory_type: str  # "DDR4" ou "DDR5"
-    quantity: Optional[int]
-    unit_capacity_go: Optional[int]
-    total_go: Optional[float]
-    price_total_eur: Optional[float]
-    price_is_per_unit: bool
-    price_per_go_eur: Optional[float]
-    source: str
-    url: str
-    scraped_at: str
 
 
 def fetch(url: str) -> BeautifulSoup:
@@ -116,16 +108,7 @@ def fetch(url: str) -> BeautifulSoup:
     return soup
 
 
-def parse_number(raw: str) -> Optional[float]:
-    """Convertit '1 140,00' ou '620.00' ou '500' en float."""
-    if not raw:
-        return None
-    cleaned = raw.strip().replace(" ", "").replace("\xa0", "")
-    cleaned = cleaned.replace(",", ".")
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
+parse_number = common_parse_number
 
 
 def extract_ad_id(href: str) -> str:
@@ -196,13 +179,15 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
         if not title:
             continue
 
-        # On ne garde que les annonces qui parlent vraiment de RAM DDR
-        # (le mot-clé de recherche peut aussi remonter des PC portables
-        # qui *contiennent* de la DDR4/DDR5, pas juste des barrettes).
-        title_lower = title.lower()
-        if "ram" not in title_lower and "ddr" not in title_lower:
+        # On ne garde que les annonces qui parlent vraiment de barrettes
+        # DDR4/DDR5 (le mot-clé de recherche remonte aussi des PC
+        # portables ou postes fixes qui *contiennent* de la DDR4/DDR5,
+        # et de la DDR3 dont le titre contient quand même "RAM").
+        # is_relevant_ddr_title() exige "ddr4"/"ddr5" explicite dans le
+        # titre et exclut les appareils complets (thinkpad, laptop...).
+        if not is_relevant_ddr_title(title):
             if debug_shown < 8:
-                print(f"[diag] Titre ignoré (pas 'ram'/'ddr') : {title!r}", file=sys.stderr)
+                print(f"[diag] Titre ignoré (pas DDR4/DDR5 pur) : {title!r}", file=sys.stderr)
                 debug_shown += 1
             continue
 
@@ -260,21 +245,20 @@ def parse_search_page(soup: BeautifulSoup, memory_type: str, source_url: str) ->
         capacity_match = RE_CAPACITY_GO.search(title)
         unit_capacity_go = int(capacity_match.group(1)) if capacity_match else None
 
-        total_go = None
-        price_per_go = None
-        if unit_capacity_go and quantity:
-            total_go = unit_capacity_go * quantity
-        if price_total is not None and total_go:
-            effective_total_price = (
-                price_total * quantity if price_is_per_unit else price_total
-            )
-            price_per_go = round(effective_total_price / total_go, 3)
+        # On se fie au titre (plus fiable que la page de recherche
+        # d'origine : une page "recherche DDR4" peut très bien remonter
+        # une annonce dont le titre dit clairement "DDR5").
+        detected_type = detect_memory_type(title) or memory_type
+
+        total_go, price_per_go = compute_derived_fields(
+            quantity, unit_capacity_go, price_total, price_is_per_unit
+        )
 
         lots.append(
             Lot(
                 id=f"destockplus-{ad_id}",
                 title=title,
-                memory_type=memory_type,
+                memory_type=detected_type,
                 quantity=quantity,
                 unit_capacity_go=unit_capacity_go,
                 total_go=total_go,
